@@ -1,0 +1,65 @@
+name: AM Reviewer
+
+on:
+  repository_dispatch:
+    types: [am-check]
+  workflow_dispatch:
+
+concurrency:
+  group: am-seat-monitor
+  cancel-in-progress: false
+
+jobs:
+  check-seats:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright Chromium
+        timeout-minutes: 5
+        run: npx playwright install --with-deps chromium
+
+      - name: Restore state
+        uses: actions/cache/restore@v4
+        with:
+          path: seat-state.json
+          key: seat-state-${{ github.run_id }}
+          restore-keys: |
+            seat-state-
+
+      - name: Run check
+        env:
+          STATE_FILE: seat-state.json
+        run: node am-checker.js --once
+
+      - name: Save state
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: seat-state.json
+          key: seat-state-${{ github.run_id }}
+
+      - name: Wait before next run
+        if: always()
+        run: sleep 120
+
+      - name: Trigger next run
+        if: always()
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          event-type: am-check

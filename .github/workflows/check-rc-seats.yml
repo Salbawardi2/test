@@ -1,0 +1,64 @@
+name: RC Reviewer
+
+on:
+  repository_dispatch:
+    types: [rc-check]
+  workflow_dispatch:
+
+concurrency:
+  group: rc-seat-monitor
+  cancel-in-progress: false
+
+jobs:
+  check-rc-seats:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright Chromium
+        timeout-minutes: 5
+        run: npx playwright install --with-deps chromium
+
+      - name: Restore state
+        uses: actions/cache/restore@v4
+        with:
+          path: rc-seat-state.json
+          key: rc-seat-state-${{ github.run_id }}
+          restore-keys: |
+            rc-seat-state-
+
+      - name: Run check
+        env:
+          STATE_FILE: rc-seat-state.json
+        run: node rc-checker.js --once
+
+      - name: Save state
+        uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: rc-seat-state.json
+          key: rc-seat-state-${{ github.run_id }}
+
+      - name: Wait before next run
+        if: always()
+        run: sleep 120
+
+      - name: Trigger next run
+        if: always()
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          event-type: rc-check

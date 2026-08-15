@@ -1,0 +1,14 @@
+{
+  "name": "amc-seat-checker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Monitors AMC showtime seat availability and alerts via ntfy.sh when good seats open up.",
+  "main": "check-seats.js",
+  "scripts": {
+    "start": "node check-seats.js",
+    "check": "node check-seats.js --once"
+  },
+  "dependencies": {
+    "playwright": "^1.62.1"
+  }
+}

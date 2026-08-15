@@ -1,0 +1,3 @@
+node_modules/
+seat-state.json
+*.log
